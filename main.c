@@ -44,7 +44,7 @@ enum {
 };
 
 static int set_oom_score_adj(int);
-static void poll_loop(const poll_loop_args_t* args);
+static void poll_loop(poll_loop_args_t* args);
 
 // Prevent Golang / Cgo name collision when the test suite runs -
 // Cgo generates it's own main function.
@@ -86,7 +86,7 @@ int main(int argc, char* argv[])
         .swap_term_percent = 10,
         .mem_kill_percent = 5,
         .swap_kill_percent = 5,
-        .report_interval_ms = 1000,
+        .report_interval_ms = 10000,
         .ignore_root_user = false,
         /* omitted fields are set to zero */
     };
@@ -210,10 +210,12 @@ int main(int argc, char* argv[])
             exit(0);
         case 'r':
             report_interval_f = strtof(optarg, NULL);
-            if (report_interval_f < 0) {
-                fatal(14, "-r: invalid interval '%s'\n", optarg);
+            if (report_interval_f > 10) {
+                args.report_interval_ms = (int)(report_interval_f * 1000);
+            } else {
+                warn("-r: invalid interval '%s' ,need to > 10s\n", optarg);
             }
-            args.report_interval_ms = (int)(report_interval_f * 1000);
+            
             break;
         case 'p':
             set_my_priority = 1;
@@ -435,9 +437,19 @@ static int lowmem_sig(const poll_loop_args_t* args, const meminfo_t* m)
         return SIGTERM;
     return 0;
 }
+/* enter warning mode for MemAvailable < MemTotal*10% && MemAvailable < 6.4G 
+ *
+ *
+ */
+static int warnmem_sig(const poll_loop_args_t* args, const meminfo_t* m)
+{
+    return !!((m->MemAvailableKiB < WARN_KSIZE) && (m->MemAvailableKiB <= m->MemTotalKiB * WARN_RATE));
+}
+
+
 
 // poll_loop is the main event loop. Never returns.
-static void poll_loop(const poll_loop_args_t* args)
+static void poll_loop(poll_loop_args_t* args)
 {
     // Print a a memory report when this reaches zero. We start at zero so
     // we print the first report immediately.
@@ -446,6 +458,10 @@ static void poll_loop(const poll_loop_args_t* args)
     while (1) {
         meminfo_t m = parse_meminfo();
         int sig = lowmem_sig(args, &m);
+        if (warnmem_sig(args, &m)) {
+            args->report_interval_ms = 1000;
+            warn("low Available memory entry warning mode \n");
+        }
         if (sig == SIGKILL) {
             print_mem_stats(warn, m);
             warn("low memory! at or below SIGKILL limits: mem " PRIPCT ", swap " PRIPCT "\n",
