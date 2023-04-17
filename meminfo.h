@@ -1,10 +1,10 @@
 /* SPDX-License-Identifier: MIT */
 #ifndef MEMINFO_H
 #define MEMINFO_H
+#include <stdbool.h>
+#include <sys/types.h>
 
 #define PATH_LEN 256
-
-#include <stdbool.h>
 #define WARN_KSIZE (6.4*1024*1024) //6.4G
 #define WARN_RATE (0.1) //10%
 typedef struct {

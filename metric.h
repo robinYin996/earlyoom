@@ -1,0 +1,34 @@
+#ifndef __MISC__
+#define __MISC__
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
+
+struct cpu_util {
+    float user;
+    float nice;
+    float system;
+    float idle;
+    float iowait;
+    float irq;
+    float softirq;
+    float steal;
+    float guest;
+    float guest_nice;
+};
+
+struct cpu_stat {
+    long user;
+    long nice;
+    long system;
+    long idle;
+    long iowait;
+    long irq;
+    long softirq;
+    long steal;
+    long guest;
+    long guest_nice;
+};
+
+#endif

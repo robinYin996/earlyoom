@@ -46,6 +46,9 @@ enum {
 static int set_oom_score_adj(int);
 static void poll_loop(poll_loop_args_t* args);
 
+extern int metric_init(poll_loop_args_t *poll);
+extern int get_cpu_stat(poll_loop_args_t *poll);
+extern int metric_exit(poll_loop_args_t *poll);
 // Prevent Golang / Cgo name collision when the test suite runs -
 // Cgo generates it's own main function.
 #ifdef CGO
@@ -210,10 +213,10 @@ int main(int argc, char* argv[])
             exit(0);
         case 'r':
             report_interval_f = strtof(optarg, NULL);
-            if (report_interval_f > 10) {
+            if (report_interval_f >= 1) {
                 args.report_interval_ms = (int)(report_interval_f * 1000);
             } else {
-                warn("-r: invalid interval '%s' ,need to > 10s\n", optarg);
+                warn("-r: invalid interval '%s' ,need to > 1s\n", optarg);
             }
             
             break;
@@ -360,9 +363,12 @@ int main(int argc, char* argv[])
     if (err != 0) {
         perror("Could not lock memory - continuing anyway");
     }
-
+    
+    metric_init(&args);
     // Jump into main poll loop
     poll_loop(&args);
+
+    metric_exit(&args);
     return 0;
 }
 
@@ -447,7 +453,6 @@ static int warnmem_sig(const poll_loop_args_t* args, const meminfo_t* m)
 }
 
 
-
 // poll_loop is the main event loop. Never returns.
 static void poll_loop(poll_loop_args_t* args)
 {
@@ -458,10 +463,11 @@ static void poll_loop(poll_loop_args_t* args)
     while (1) {
         meminfo_t m = parse_meminfo();
         int sig = lowmem_sig(args, &m);
-        if (warnmem_sig(args, &m)) {
+        if (warnmem_sig(args, &m) && (args->report_interval_ms!=1000)) {
             args->report_interval_ms = 1000;
             warn("low Available memory entry warning mode \n");
         }
+        get_cpu_stat(args);
         if (sig == SIGKILL) {
             print_mem_stats(warn, m);
             warn("low memory! at or below SIGKILL limits: mem " PRIPCT ", swap " PRIPCT "\n",
