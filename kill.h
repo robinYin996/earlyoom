@@ -31,8 +31,6 @@ typedef struct {
     int report_interval_ms;
     /* Flag --dryrun was passed */
     bool dryrun;
-    FILE *cstat_fd;
-    FILE *vmstat_fd;
     struct cpu_stat cstat_prev;
     struct cpu_util cstat_util;
 } poll_loop_args_t;

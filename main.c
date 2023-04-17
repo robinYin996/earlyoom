@@ -14,6 +14,7 @@
 #include <sys/resource.h>
 #include <sys/wait.h>
 #include <time.h>
+#include <sys/time.h>
 #include <unistd.h>
 
 #include "globals.h"
@@ -459,8 +460,10 @@ static void poll_loop(poll_loop_args_t* args)
     // Print a a memory report when this reaches zero. We start at zero so
     // we print the first report immediately.
     int report_countdown_ms = 0;
-
+    struct timeval start, end;
+    printf("args->report_interval_ms:%d\n",args->report_interval_ms);
     while (1) {
+        gettimeofday(&start, NULL);
         meminfo_t m = parse_meminfo();
         int sig = lowmem_sig(args, &m);
         if (warnmem_sig(args, &m) && (args->report_interval_ms!=1000)) {
@@ -496,8 +499,12 @@ static void poll_loop(poll_loop_args_t* args)
             print_mem_stats(printf, m);
             report_countdown_ms = args->report_interval_ms;
         }
-        unsigned sleep_ms = sleep_time_ms(args, &m);
-        debug("adaptive sleep time: %d ms\n", sleep_ms);
+        gettimeofday(&end, NULL);
+        long sleep_ms = (end.tv_sec - start.tv_sec)*1000 + (end.tv_usec - start.tv_usec)/1000;
+        if (args->report_interval_ms > sleep_ms)
+            sleep_ms = args->report_interval_ms - sleep_ms;
+        else
+            sleep_ms = args->report_interval_ms;
         struct timespec req = { .tv_sec = (time_t)(sleep_ms / 1000), .tv_nsec = (sleep_ms % 1000) * 1000000 };
         while (nanosleep(&req, &req) == -1 && errno == EINTR)
             ;

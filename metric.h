@@ -11,6 +11,9 @@ struct cpu_util {
     float system;
     float idle;
     float iowait;
+    float iowait_avg10;
+    float iowait_avg30;
+    float iowait_avg60;
     float irq;
     float softirq;
     float steal;
