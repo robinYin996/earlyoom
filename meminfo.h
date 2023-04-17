@@ -7,6 +7,16 @@
 #define PATH_LEN 256
 #define WARN_KSIZE (6.4*1024*1024) //6.4G
 #define WARN_RATE (0.1) //10%
+
+/*
+ * NORMAL: MemAvailable > memToal*10%
+ * WARN:   MemAvailable < memTotal*10% 
+ * CRI:    kswaped is active for memory reclaim
+ * ALERT:  system entry direct memory reclaim
+ * EMER :  system is block for direct memory reclaim(may oom kill)
+ * */
+typedef enum {NORMAL=1,WARN,CRIT,ALERT,EMER} memstatus;
+
 typedef struct {
     // Values from /proc/meminfo, in KiB
     long long MemTotalKiB;

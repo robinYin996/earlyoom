@@ -448,9 +448,10 @@ static int lowmem_sig(const poll_loop_args_t* args, const meminfo_t* m)
  *
  *
  */
-static int warnmem_sig(const poll_loop_args_t* args, const meminfo_t* m)
+static int mem_status(poll_loop_args_t* args, const meminfo_t* m)
 {
-    return !!((m->MemAvailableKiB < WARN_KSIZE) && (m->MemAvailableKiB <= m->MemTotalKiB * WARN_RATE));
+     if ((m->MemAvailableKiB < WARN_KSIZE) && (m->MemAvailableKiB <= m->MemTotalKiB * WARN_RATE))
+        args->mode = WARN;
 }
 
 
@@ -466,7 +467,7 @@ static void poll_loop(poll_loop_args_t* args)
         gettimeofday(&start, NULL);
         meminfo_t m = parse_meminfo();
         int sig = lowmem_sig(args, &m);
-        if (warnmem_sig(args, &m) && (args->report_interval_ms!=1000)) {
+        if (mem_status(args, &m) && (args->mode == WARN)) {
             args->report_interval_ms = 1000;
             warn("low Available memory entry warning mode \n");
         }
