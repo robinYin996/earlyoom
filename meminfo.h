@@ -5,9 +5,12 @@
 #include <sys/types.h>
 
 #define PATH_LEN 256
+
+#define NOR_KSIZE (8*1024*1024) //8G
 #define WARN_KSIZE (6.4*1024*1024) //6.4G
 #define KILL_KSIZE (5*1024*1024) //5G
 #define WARN_RATE (0.1) //10%
+#define NOR_RATE (0.15) //15%
 
 #define KILL_IOWAIT (40)
 #define KILL_IOWAIT_AVG (35)

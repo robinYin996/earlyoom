@@ -456,8 +456,14 @@ static int lowmem_sig(const poll_loop_args_t* args, const meminfo_t* m)
  */
 static int mem_status(poll_loop_args_t* args, const meminfo_t* m)
 {
-     if ((m->MemAvailableKiB < WARN_KSIZE) && (m->MemAvailableKiB <= m->MemTotalKiB * WARN_RATE))
-        args->mode = WARN;
+    int mode = args->mode;
+    if ((m->MemAvailableKiB < WARN_KSIZE) && (m->MemAvailableKiB <= m->MemTotalKiB * WARN_RATE)) {
+        mode = WARN;
+    }
+    if ((m->MemAvailableKiB > NOR_KSIZE) || (m->MemAvailableKiB > m->MemTotalKiB * NOR_RATE)) {
+        mode = NORMAL;
+    }
+    return mode; 
 }
 
 // poll_loop is the main event loop. Never returns.
@@ -466,17 +472,29 @@ static void poll_loop(poll_loop_args_t* args)
     // Print a a memory report when this reaches zero. We start at zero so
     // we print the first report immediately.
     int report_countdown_ms = 0;
+    int report_prev_ms = args->report_interval_ms;
     struct timeval start, end;
     printf("args->report_interval_ms:%d\n",args->report_interval_ms);
+    args->mode = NORMAL;
     while (1) {
         gettimeofday(&start, NULL);
         meminfo_t m = parse_meminfo();
-        int sig = lowmem_sig(args, &m);
-        if (mem_status(args, &m) && (args->mode == WARN)) {
+        int sig = 0;
+        
+        mem_status(args, &m);
+        if ((args->mode != WARN) && (mem_status(args, &m)== WARN)) {
             args->report_interval_ms = 1000;
+            args->mode = WARN;
             warn("low Available memory entry warning mode \n");
+        } else if ((args->mode != NORMAL) && (mem_status(args, &m)== NORMAL)) {
+            args->report_interval_ms = report_prev_ms;
+            args->mode = NORMAL;
+            warn("normal Available memory entry warning mode \n");
         }
-        get_cpu_stat(args);
+
+        if (args->mod == WARN)
+            get_cpu_stat(args);
+        sig = lowmem_sig(args, &m);
         if (sig == SIGKILL) {
             print_mem_stats(warn, m);
             warn("low memory! at or below SIGKILL limits: mem " PRIPCT ", swap " PRIPCT "\n",
