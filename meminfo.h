@@ -6,7 +6,13 @@
 
 #define PATH_LEN 256
 #define WARN_KSIZE (6.4*1024*1024) //6.4G
+#define KILL_KSIZE (5*1024*1024) //5G
 #define WARN_RATE (0.1) //10%
+
+#define KILL_IOWAIT (40)
+#define KILL_IOWAIT_AVG (35)
+#define KILL_CACHE_KSIZE (1.6*1024*1024)
+#define KILL_CACHE_RATE  (0.04) //%4
 
 /*
  * NORMAL: MemAvailable > memToal*10%
@@ -20,6 +26,7 @@ typedef enum {NORMAL=1,WARN,CRIT,ALERT,EMER} memstatus;
 typedef struct {
     // Values from /proc/meminfo, in KiB
     long long MemTotalKiB;
+    long long MemFileCacheKiB;
     long long MemAvailableKiB;
     long long SwapTotalKiB;
     long long SwapFreeKiB;

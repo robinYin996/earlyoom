@@ -437,10 +437,17 @@ static unsigned sleep_time_ms(const poll_loop_args_t* args, const meminfo_t* m)
  */
 static int lowmem_sig(const poll_loop_args_t* args, const meminfo_t* m)
 {
-    if (m->MemAvailablePercent <= args->mem_kill_percent && m->SwapFreePercent <= args->swap_kill_percent)
-        return SIGKILL;
-    else if (m->MemAvailablePercent <= args->mem_term_percent && m->SwapFreePercent <= args->swap_term_percent)
-        return SIGTERM;
+    if (m->MemAvailablePercent <= args->mem_kill_percent && (m->MemAvailableKiB <= KILL_KSIZE)) {
+        if ((args->cstat_util.iowait_avg30 > KILL_IOWAIT_AVG) && (args->cstat_util.iowait > KILL_IOWAIT))
+            if ((m->MemFileCacheKiB < m->MemTotalKiB*KILL_CACHE_RATE) && (m->MemFileCacheKiB< KILL_CACHE_KSIZE)) 
+                return SIGKILL;
+    }
+    if (m->MemAvailablePercent <= args->mem_term_percent && (m->MemAvailableKiB <= WARN_KSIZE)) {
+        if ((args->cstat_util.iowait_avg30 > KILL_IOWAIT_AVG) && (args->cstat_util.iowait > KILL_IOWAIT))
+            if ((m->MemFileCacheKiB < m->MemTotalKiB*KILL_CACHE_RATE) && (m->MemFileCacheKiB< KILL_CACHE_KSIZE)) 
+                return SIGTERM;
+    }
+
     return 0;
 }
 /* enter warning mode for MemAvailable < MemTotal*10% && MemAvailable < 6.4G 
@@ -452,7 +459,6 @@ static int mem_status(poll_loop_args_t* args, const meminfo_t* m)
      if ((m->MemAvailableKiB < WARN_KSIZE) && (m->MemAvailableKiB <= m->MemTotalKiB * WARN_RATE))
         args->mode = WARN;
 }
-
 
 // poll_loop is the main event loop. Never returns.
 static void poll_loop(poll_loop_args_t* args)

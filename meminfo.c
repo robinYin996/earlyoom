@@ -96,6 +96,8 @@ meminfo_t parse_meminfo()
     m.SwapTotalKiB = get_entry_fatal("SwapTotal:", buf);
     m.AnonPagesKiB = get_entry_fatal("AnonPages:", buf);
     m.SwapFreeKiB = get_entry_fatal("SwapFree:", buf);
+    m.MemFileCacheKiB = get_entry_fatal("Active(file):", buf);
+    m.MemFileCacheKiB += get_entry_fatal("Inactive(file):", buf);
 
     m.MemAvailableKiB = get_entry("MemAvailable:", buf);
     if (m.MemAvailableKiB < 0) {
