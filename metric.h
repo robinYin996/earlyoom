@@ -9,6 +9,9 @@ struct cpu_util {
     float user;
     float nice;
     float system;
+    float system_avg10;
+    float system_avg30;
+    float system_avg60;
     float idle;
     float iowait;
     float iowait_avg10;

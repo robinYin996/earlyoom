@@ -435,16 +435,73 @@ static unsigned sleep_time_ms(const poll_loop_args_t* args, const meminfo_t* m)
  * response. 0 means that there is enough memory and we should
  * not kill anything.
  */
+
+static int high_iowait(const poll_loop_args_t* args, const meminfo_t* m, int fast)
+{
+	long iowait_avg = 0;
+	long thres = 0;
+	int ret = 0;
+	if (fast) {
+	   thres = KILL_IOWAIT_TAVG;
+	   iowait_avg = args->cstat_util.iowait_avg10;
+	} else {
+	   thres = KILL_IOWAIT_KAVG;
+	   iowait_avg = args->cstat_util.iowait_avg30;
+	}
+	ret =!!((iowait_avg > thres) && (args->cstat_util.iowait > KILL_IOWAIT));
+	printf("high iowait: %d\n",ret);
+	return ret;
+}
+
+static int high_system(const poll_loop_args_t* args, const meminfo_t* m, int fast)
+{
+	long avg = 0;
+	long thres = 0;
+	int ret = 0;
+	if (fast) {
+	   thres = KILL_SYSTEM_TAVG;
+	   avg = args->cstat_util.system_avg10;
+	} else {
+	   thres = KILL_SYSTEM_KAVG;
+	   avg = args->cstat_util.system_avg30;
+	}
+	ret = !!((avg > thres) && (args->cstat_util.system > KILL_SYSTEM));
+	printf("high system:%d\n", ret);
+	return ret;
+}
+
+static int low_mem(const poll_loop_args_t* args, const meminfo_t* m, int fast)
+{
+	long percent = 0;
+	long size = 0;
+	int ret = 0;
+	if (fast) {
+	   size = WARN_KSIZE;
+	   percent = args->mem_term_percent;
+	} else {
+	   size = KILL_KSIZE;
+	   percent = args->mem_kill_percent;
+	}
+	ret = !!((m->MemFileCacheKiB < percent) && (m->MemAvailableKiB < size));
+	printf("low mem:%d\n", ret);
+}
+
+
+
+static int low_cache(const poll_loop_args_t* args, const meminfo_t* m)
+{
+	int ret ;
+	ret = !!((m->MemFileCacheKiB < m->MemTotalKiB*KILL_CACHE_RATE) && (m->MemFileCacheKiB< KILL_CACHE_KSIZE));	
+	printf("low cache:%d\n", ret);
+	return ret;
+}
+
 static int lowmem_sig(const poll_loop_args_t* args, const meminfo_t* m)
 {
-    if (m->MemAvailablePercent <= args->mem_kill_percent && (m->MemAvailableKiB <= KILL_KSIZE)) {
-        if ((args->cstat_util.iowait_avg30 > KILL_IOWAIT_AVG) && (args->cstat_util.iowait > KILL_IOWAIT))
-            if ((m->MemFileCacheKiB < m->MemTotalKiB*KILL_CACHE_RATE) && (m->MemFileCacheKiB< KILL_CACHE_KSIZE)) 
+    if (low_mem(args,m, 0) && (high_iowait(args, m,0) || high_system(args, m, 0)) && low_cache(args, m)) {
                 return SIGKILL;
     }
-    if (m->MemAvailablePercent <= args->mem_term_percent && (m->MemAvailableKiB <= WARN_KSIZE)) {
-        if ((args->cstat_util.iowait_avg30 > KILL_IOWAIT_AVG) && (args->cstat_util.iowait > KILL_IOWAIT))
-            if ((m->MemFileCacheKiB < m->MemTotalKiB*KILL_CACHE_RATE) && (m->MemFileCacheKiB< KILL_CACHE_KSIZE)) 
+    if (low_mem(args,m, 1) && (high_iowait(args, m,1) || high_system(args, m, 1)) && low_cache(args, m)) {
                 return SIGTERM;
     }
 
@@ -466,16 +523,31 @@ static int mem_status(poll_loop_args_t* args, const meminfo_t* m)
     return mode; 
 }
 
+void print_iowait(poll_loop_args_t *poll)
+{
+	warn("iowait: %.2f%% iowaitavg10: %2.f%% iowaitavg30: %2.f%% iowaitavg60: %2.f%%\n", \
+        poll->cstat_util.iowait, poll->cstat_util.iowait_avg10, \
+        poll->cstat_util.iowait_avg30, poll->cstat_util.iowait_avg60);
+}
+
+void print_system(poll_loop_args_t *poll)
+{
+	warn("system: %.2f%% systemavg10: %2.f%% systemavg30: %2.f%% systemavg60: %2.f%%\n", \
+        poll->cstat_util.system, poll->cstat_util.system_avg10, \
+        poll->cstat_util.system_avg30, poll->cstat_util.system_avg60);
+}
+
+
 void print_killinfo(poll_loop_args_t *poll)
 {
     meminfo_t m;
     m = parse_meminfo();
     print_mem_stats(warn, m);
     warn("min:%ld low: %ld  high: %ld\n", poll->min, poll->low, poll->high);
-    warn("iowait: %.2f%% iowaitavg10: %2.f%% iowaitavg30: %2.f%% iowaitavg60: %2.f%%\n", \
-        poll->cstat_util.iowait, poll->cstat_util.iowait_avg10, \
-        poll->cstat_util.iowait_avg30, poll->cstat_util.iowait_avg60);
+    print_iowait(poll);
+    print_system(poll);
 }
+
 
 // poll_loop is the main event loop. Never returns.
 static void poll_loop(poll_loop_args_t* args)
@@ -503,8 +575,7 @@ static void poll_loop(poll_loop_args_t* args)
             warn("normal Available memory entry warning mode \n");
         }
 
-        if (args->mode == WARN)
-            get_cpu_stat(args);
+        get_cpu_stat(args);
         sig = lowmem_sig(args, &m);
         if (sig == SIGKILL) {
             print_mem_stats(warn, m);
@@ -534,6 +605,8 @@ static void poll_loop(poll_loop_args_t* args)
             }
         } else if (args->report_interval_ms && report_countdown_ms <= 0) {
             print_mem_stats(printf, m);
+	    print_iowait(args);
+	    print_system(args);
             report_countdown_ms = args->report_interval_ms;
         }
         gettimeofday(&end, NULL);

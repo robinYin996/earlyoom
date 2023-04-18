@@ -148,6 +148,17 @@ static int calc_percent(struct cpu_stat *diff, poll_loop_args_t *poll) {
         
         prev_avg = poll->cstat_util.iowait_avg60;
         poll->cstat_util.iowait_avg60 = avg_x(curr, prev_avg, factor_x(interval,60));
+	
+	/* for system avg */ 
+        prev_avg = poll->cstat_util.system_avg10;
+        curr = poll->cstat_util.system;
+        poll->cstat_util.system_avg10 = avg_x(curr, prev_avg, factor_x(interval,10));
+
+        prev_avg = poll->cstat_util.system_avg30;
+        poll->cstat_util.system_avg30 = avg_x(curr, prev_avg, factor_x(interval,30));
+        
+        prev_avg = poll->cstat_util.system_avg60;
+        poll->cstat_util.system_avg60 = avg_x(curr, prev_avg, factor_x(interval,60));
 
     }
     return 0;
