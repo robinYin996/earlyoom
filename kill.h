@@ -33,6 +33,7 @@ typedef struct {
     bool dryrun;
     struct cpu_stat cstat_prev;
     struct cpu_util cstat_util;
+    meminfo_t m;
     memstatus mode;
     long min;
     long low;

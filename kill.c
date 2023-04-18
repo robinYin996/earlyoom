@@ -255,12 +255,49 @@ int kill_wait(const poll_loop_args_t* args, pid_t pid, int sig)
     return -1;
 }
 
+static get_oom_points(const poll_loop_args_t* args, long *points, procinfo_t* cur)
+{
+    long rss = 0;
+    int adj = 0;;
+
+    get_oom_score_adj(cur->pid, &adj);
+    rss = get_vm_rss_kib(cur->pid);
+
+    if (adj == -1000 || rss < 1024)
+        return false;
+
+    cur->oom_score_adj = adj;
+    cur->VmRSSkiB = rss;
+
+    if ((args->prefer_regex || args->avoid_regex || args->ignore_regex)) {
+        int res = get_comm(cur->pid, cur->name, sizeof(cur->name));
+        if (res < 0) {
+            debug("pid %d: error reading process name: %s\n", cur->pid, strerror(-res));
+            return false;
+        }
+        if (args->prefer_regex && regexec(args->prefer_regex, cur->name, (size_t)0, NULL, 0) == 0) {
+            adj += BADNESS_PREFER;
+        }
+        if (args->avoid_regex && regexec(args->avoid_regex, cur->name, (size_t)0, NULL, 0) == 0) {
+            adj += BADNESS_AVOID;
+        }
+        if (args->ignore_regex && regexec(args->ignore_regex, cur->name, (size_t)0, NULL, 0) == 0) {
+            return false;
+        }
+    }
+
+    rss += adj * (args->m.MemTotalKiB/1000);
+    *points = rss;
+    return true;
+}
 // is_larger finds out if the process with pid `cur->pid` uses more memory
 // than our current `victim`.
 // In the process, it fills the `cur` structure. It does so lazily, meaning
 // it only fills the fields it needs to make a decision.
 bool is_larger(const poll_loop_args_t* args, const procinfo_t* victim, procinfo_t* cur)
 {
+    long points = 0;
+
     if (cur->pid <= 1) {
         // Let's not kill init.
         return false;
@@ -280,63 +317,18 @@ bool is_larger(const poll_loop_args_t* args, const procinfo_t* victim, procinfo_
     }
 
     {
-        int res = get_oom_score(cur->pid);
+        int res = get_oom_points(args, &points, cur); 
         if (res < 0) {
             debug("pid %d: error reading oom_score: %s\n", cur->pid, strerror(-res));
             return false;
         }
-        cur->badness = res;
+        cur->badness = points;
     }
-
-    if ((args->prefer_regex || args->avoid_regex || args->ignore_regex)) {
-        int res = get_comm(cur->pid, cur->name, sizeof(cur->name));
-        if (res < 0) {
-            debug("pid %d: error reading process name: %s\n", cur->pid, strerror(-res));
-            return false;
-        }
-        if (args->prefer_regex && regexec(args->prefer_regex, cur->name, (size_t)0, NULL, 0) == 0) {
-            cur->badness += BADNESS_PREFER;
-        }
-        if (args->avoid_regex && regexec(args->avoid_regex, cur->name, (size_t)0, NULL, 0) == 0) {
-            cur->badness += BADNESS_AVOID;
-        }
-        if (args->ignore_regex && regexec(args->ignore_regex, cur->name, (size_t)0, NULL, 0) == 0) {
-            return false;
-        }
-    }
-
     if (cur->badness < victim->badness) {
-        return false;
-    }
-
-    {
-        long long res = get_vm_rss_kib(cur->pid);
-        if (res < 0) {
-            debug("pid %d: error reading rss: %s\n", cur->pid, strerror((int)-res));
-            return false;
-        }
-        cur->VmRSSkiB = res;
-    }
-
-    if (cur->VmRSSkiB == 0) {
-        // Kernel threads have zero rss
         return false;
     }
     if (cur->badness == victim->badness && cur->VmRSSkiB <= victim->VmRSSkiB) {
         return false;
-    }
-
-    // Skip processes with oom_score_adj = -1000, like the
-    // kernel oom killer would.
-    {
-        int res = get_oom_score_adj(cur->pid, &cur->oom_score_adj);
-        if (res < 0) {
-            debug("pid %d: error reading oom_score_adj: %s\n", cur->pid, strerror(-res));
-            return false;
-        }
-        if (cur->oom_score_adj == -1000) {
-            return false;
-        }
     }
 
     // Looks like we have a new victim. Fill out remaining fields
@@ -356,7 +348,7 @@ void debug_print_procinfo(const procinfo_t* cur)
     if (!enable_debug) {
         return;
     }
-    debug("pid %5d: badness %3d VmRSS %7lld uid %4d oom_score_adj %4d \"%s\"",
+    debug("pid %5d: badness %3ld VmRSS %7lld uid %4d oom_score_adj %4d \"%s\"",
         cur->pid, cur->badness, cur->VmRSSkiB, cur->uid, cur->oom_score_adj, cur->name);
 }
 
@@ -453,8 +445,8 @@ void kill_process(const poll_loop_args_t* args, int sig, const procinfo_t* victi
     }
     // sig == 0 is used as a self-test during startup. Don't notify the user.
     if (sig != 0 || enable_debug) {
-        warn("sending %s to process %d uid %d \"%s\": badness %d, VmRSS %lld MiB\n",
-            sig_name, victim->pid, victim->uid, victim->name, victim->badness, victim->VmRSSkiB / 1024);
+        warn("sending %s to process %d uid %d \"%s\": badness %ld, VmRSS %lld MiB adj:%d\n",
+            sig_name, victim->pid, victim->uid, victim->name, victim->badness, victim->VmRSSkiB / 1024, victim->oom_score_adj);
     }
 
     int res = kill_wait(args, victim->pid, sig);

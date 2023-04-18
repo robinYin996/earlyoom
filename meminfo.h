@@ -47,7 +47,7 @@ typedef struct {
 typedef struct procinfo {
     int pid;
     int uid;
-    int badness;
+    long badness;
     int oom_score_adj;
     long long VmRSSkiB;
     char name[PATH_LEN];

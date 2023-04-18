@@ -457,10 +457,10 @@ static int lowmem_sig(const poll_loop_args_t* args, const meminfo_t* m)
 static int mem_status(poll_loop_args_t* args, const meminfo_t* m)
 {
     int mode = args->mode;
-    if ((m->MemAvailableKiB < WARN_KSIZE) && (m->MemAvailableKiB <= m->MemTotalKiB * WARN_RATE)) {
+    if ((m->MemAvailableKiB < WARN_KSIZE) && (m->MemAvailableKiB <= (m->MemTotalKiB * WARN_RATE))) {
         mode = WARN;
     }
-    if ((m->MemAvailableKiB > NOR_KSIZE) || (m->MemAvailableKiB > m->MemTotalKiB * NOR_RATE)) {
+    if ((m->MemAvailableKiB > NOR_KSIZE) || ((m->MemAvailableKiB > m->MemTotalKiB * NOR_RATE))) {
         mode = NORMAL;
     }
     return mode; 
@@ -491,7 +491,7 @@ static void poll_loop(poll_loop_args_t* args)
         gettimeofday(&start, NULL);
         meminfo_t m = parse_meminfo();
         int sig = 0;
-        
+        args->m = m; 
         mem_status(args, &m);
         if ((args->mode != WARN) && (mem_status(args, &m)== WARN)) {
             args->report_interval_ms = 1000;
@@ -525,6 +525,7 @@ static void poll_loop(poll_loop_args_t* args)
              * of processes (try "make bench").
              */
             m = parse_meminfo();
+            args->m = m;
             if (lowmem_sig(args, &m) == 0) {
                 warn("memory situation has recovered while selecting victim\n");
             } else {
