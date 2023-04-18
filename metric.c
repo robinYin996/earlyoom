@@ -3,6 +3,86 @@
 #include "metric.h"
 #include <math.h>
 #include <time.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+ long get_watermark_scale_factor(void)
+{
+    int fd; 
+    char path[] = "/proc/sys/vm/watermark_scale_factor";
+    char buffer[32];
+    long watermark_scale_factor = 0;
+
+    fd = open(path, O_RDONLY);
+    if (fd < 0) {
+        return 0;
+    }   
+
+    if (read(fd, buffer, sizeof(buffer)) < 0) {
+        close(fd);
+        return 0;
+    }
+
+    close(fd);
+
+    watermark_scale_factor = atol(buffer);
+
+    printf("watermark_scale_factor: %ld", watermark_scale_factor);
+
+    return watermark_scale_factor;
+}
+
+ long get_min_free(void)
+{
+    int fd;
+    char path[] = "/proc/sys/vm/min_free_kbytes";
+    char buffer[32];
+    long min_free_kbytes;
+
+    fd = open(path, O_RDONLY);
+    if (fd < 0) {
+        printf("Failed to open file");
+        return -1;
+    }
+
+    if (read(fd, buffer, sizeof(buffer)) < 0) {
+        printf("Failed to read file");
+        return -1;
+    }
+
+    close(fd);
+
+    min_free_kbytes = atol(buffer);
+
+    printf("min_free_kbytes: %ld", min_free_kbytes);
+
+    return min_free_kbytes;
+}
+
+int get_watermark(poll_loop_args_t *poll, meminfo_t *m)
+{
+    long min_free_kbyte;
+    long watermark_scale_factor;
+    long tmp = 0;
+
+    min_free_kbyte = get_min_free();
+    poll->min = min_free_kbyte;
+
+    watermark_scale_factor = get_watermark_scale_factor();
+    if (watermark_scale_factor) {
+        tmp = m->MemTotalKiB*watermark_scale_factor/10000;
+    }
+
+    if ((min_free_kbyte>>2) > tmp)
+        tmp = min_free_kbyte>>2;
+
+    poll->low = tmp + min_free_kbyte;
+    poll->high = tmp*2 + min_free_kbyte;
+
+    printf("min:%ld low:%ld high:%ld\n", poll->min, poll->low, poll->high);
+    return 0;
+}
+
 
 float factor_x(float interval,float avg)
 {
@@ -88,6 +168,8 @@ int get_cpu_stat(poll_loop_args_t *poll)
 
 int metric_init(poll_loop_args_t *poll)
 {
+    meminfo_t m = parse_meminfo();
+    get_watermark(poll, &m);
     return 0;
 }
 

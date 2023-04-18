@@ -34,6 +34,9 @@ typedef struct {
     struct cpu_stat cstat_prev;
     struct cpu_util cstat_util;
     memstatus mode;
+    long min;
+    long low;
+    long high;
 } poll_loop_args_t;
 
 void kill_process(const poll_loop_args_t* args, int sig, const procinfo_t* victim);

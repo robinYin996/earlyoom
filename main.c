@@ -46,7 +46,6 @@ enum {
 
 static int set_oom_score_adj(int);
 static void poll_loop(poll_loop_args_t* args);
-
 extern int metric_init(poll_loop_args_t *poll);
 extern int get_cpu_stat(poll_loop_args_t *poll);
 extern int metric_exit(poll_loop_args_t *poll);
