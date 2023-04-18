@@ -85,7 +85,7 @@ static void startup_selftests(poll_loop_args_t* args)
 int main(int argc, char* argv[])
 {
     poll_loop_args_t args = {
-        .mem_term_percent = 10,
+        .mem_term_percent = 8,
         .swap_term_percent = 10,
         .mem_kill_percent = 5,
         .swap_kill_percent = 5,
@@ -466,6 +466,17 @@ static int mem_status(poll_loop_args_t* args, const meminfo_t* m)
     return mode; 
 }
 
+void print_killinfo(poll_loop_args_t *poll)
+{
+    meminfo_t m;
+    m = parse_meminfo();
+    print_mem_stats(warn, m);
+    warn("min:%ld low: %ld  high: %ld\n", poll->min, poll->low, poll->high);
+    warn("iowait: %.2f%% iowaitavg10: %2.f%% iowaitavg30: %2.f%% iowaitavg60: %2.f%%\n", \
+        poll->cstat_util.iowait, poll->cstat_util.iowait_avg10, \
+        poll->cstat_util.iowait_avg30, poll->cstat_util.iowait_avg60);
+}
+
 // poll_loop is the main event loop. Never returns.
 static void poll_loop(poll_loop_args_t* args)
 {
@@ -492,7 +503,7 @@ static void poll_loop(poll_loop_args_t* args)
             warn("normal Available memory entry warning mode \n");
         }
 
-        if (args->mod == WARN)
+        if (args->mode == WARN)
             get_cpu_stat(args);
         sig = lowmem_sig(args, &m);
         if (sig == SIGKILL) {
@@ -518,6 +529,7 @@ static void poll_loop(poll_loop_args_t* args)
                 warn("memory situation has recovered while selecting victim\n");
             } else {
                 kill_process(args, sig, &victim);
+                print_killinfo(args);
             }
         } else if (args->report_interval_ms && report_countdown_ms <= 0) {
             print_mem_stats(printf, m);

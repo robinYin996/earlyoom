@@ -29,6 +29,7 @@ typedef enum {NORMAL=1,WARN,CRIT,ALERT,EMER} memstatus;
 typedef struct {
     // Values from /proc/meminfo, in KiB
     long long MemTotalKiB;
+    long long MemFreeKiB;
     long long MemFileCacheKiB;
     long long MemAvailableKiB;
     long long SwapTotalKiB;

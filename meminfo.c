@@ -93,6 +93,7 @@ meminfo_t parse_meminfo()
     }
 
     m.MemTotalKiB = get_entry_fatal("MemTotal:", buf);
+    m.MemFreeKiB = get_entry_fatal("MemFree:", buf);
     m.SwapTotalKiB = get_entry_fatal("SwapTotal:", buf);
     m.AnonPagesKiB = get_entry_fatal("AnonPages:", buf);
     m.SwapFreeKiB = get_entry_fatal("SwapFree:", buf);
@@ -306,11 +307,13 @@ long long get_vm_rss_kib(int pid)
  */
 void print_mem_stats(int __attribute__((format(printf, 1, 2))) (*out_func)(const char* fmt, ...), const meminfo_t m)
 {
-    out_func("mem avail: %5lld of %5lld MiB (" PRIPCT "), swap free: %4lld of %4lld MiB (" PRIPCT ")\n",
+    out_func("mem avail: %5lld of %5lld MiB (" PRIPCT "), swap free: %4lld of %4lld MiB (" PRIPCT "), file: %5lld, free: %5lld\n",
         m.MemAvailableKiB / 1024,
         m.UserMemTotalKiB / 1024,
         m.MemAvailablePercent,
         m.SwapFreeKiB / 1024,
         m.SwapTotalKiB / 1024,
-        m.SwapFreePercent);
+        m.SwapFreePercent,
+        m.MemFileCacheKiB/1024,
+        m.MemFreeKiB/1024);
 }
