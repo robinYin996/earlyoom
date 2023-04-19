@@ -9,20 +9,20 @@
 #define NOR_KSIZE (8*1024*1024) //8G
 #define WARN_KSIZE (6.4*1024*1024) //6.4G
 #define KILL_KSIZE (5*1024*1024) //5G
-#define WARN_RATE (0.1) //10%
+#define WARN_RATE (0.12) //12%
 #define NOR_RATE (0.15) //15%
 
-#define KILL_IOWAIT (30)
+#define KILL_IOWAIT (35)
 #define KILL_IOWAIT_KAVG (35) /* kill sig*/
-#define KILL_IOWAIT_TAVG (30) /* term sig*/
+#define KILL_IOWAIT_TAVG (20) /* term sig*/
 
 #define KILL_SYSTEM (40)
 #define KILL_SYSTEM_KAVG (50) /* kill sig*/
-#define KILL_SYSTEM_TAVG (40) /* term sig*/
+#define KILL_SYSTEM_TAVG (30) /* term sig*/
 
 
 #define KILL_CACHE_KSIZE (1.6*1024*1024)
-#define KILL_CACHE_RATE  (0.04) //%4
+#define KILL_CACHE_RATE  (0.05) //%4
 
 /*
  * NORMAL: MemAvailable > memToal*10%
